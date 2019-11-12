@@ -51,6 +51,7 @@ class HmmTrain:
         '''
         word_status = []
         if len(word) == 1:
+            #单独的字也要给一个特殊的状态
             word_status.append('S')
         elif len(word) == 2:
             word_status = ['B','E']
@@ -65,8 +66,12 @@ class HmmTrain:
     
     '''基于人工标注语料库，训练发射概率，初始状态， 转移概率'''
     def train(self, train_filepath, trans_path, emit_path, start_path):
+        #trans_dict就是标记转移概率矩阵
+        #emit_dict
+        #start_dict 初始选择标记的概率，全为0
+        #思路就是统计tag->tag的次数和 tag->word次数,然后除以各自tag出现次数
         trans_dict, emit_dict, start_dict, Count_dict = self.init()
-        for line in open(train_filepath):
+        for line in open(train_filepath,encoding='utf-8'):
             self.line_index += 1
 
             line = line.strip()
@@ -77,27 +82,28 @@ class HmmTrain:
             for i in range(len(line)):
                 if line[i] == " ":
                     continue
-                char_list.append(line[i])
+                char_list.append(line[i]) # 每一行的字符
 
-            self.char_set = set(char_list)   #训练预料库中所有字的集合
+            self.char_set = set(char_list)   #当前行所有字的集合
     
             word_list = line.split(" ")
             line_status = [] #统计状态序列
     
             for word in word_list:
-                line_status.extend(self.get_word_status(word))   #一句话对应一行连续的状态
-    
+                line_status.extend(self.get_word_status(word))   #将句子的每个词打上标记
+
+            1
             if len(char_list) == len(line_status):
-               # print(word_list) # ['但', '从', '生物学', '眼光', '看', '就', '并非', '如此', '了', '。']
-               # print(line_status) # ['S', 'S', 'B', 'M', 'E', 'B', 'E', 'S', 'S', 'B', 'E', 'B', 'E', 'S', 'S']
+               # print(word_list) #   ['但', '从', '生物学', '眼光', '看', '就', '并非', '如此', '了', '。']
+               # print(line_status) # ['S',  'S', 'B', 'M', 'E', 'B', 'E', 'S', 'S', 'B', 'E', 'B', 'E', 'S', 'S']
                # print('******')
                 for i in range(len(line_status)):
                     if i == 0:#如果只有一个词，则直接算作是初始概率
                         start_dict[line_status[0]] += 1   #start_dict记录句子第一个字的状态，用于计算初始状态概率
                         Count_dict[line_status[0]] += 1   #记录每一个状态的出现次数
                     else:#统计上一个状态到下一个状态，两个状态之间的转移概率
-                        trans_dict[line_status[i-1]][line_status[i]] += 1    #用于计算转移概率
-                        Count_dict[line_status[i]] += 1
+                        trans_dict[line_status[i-1]][line_status[i]] += 1    #统计上一个标记转移到当前标记的个数，用于计算转移概率
+                        Count_dict[line_status[i]] += 1 # 计算当前每个状态已经出现的次数，用来归一化
                         #统计发射概率
                         if char_list[i] not in emit_dict[line_status[i]]:
                             emit_dict[line_status[i]][char_list[i]] = 0.0
@@ -108,7 +114,7 @@ class HmmTrain:
     
         # print(emit_dict)#{'S': {'否': 10.0, '昔': 25.0, '直': 238.0, '六': 1004.0, '殖': 17.0, '仗': 36.0, '挪': 15.0, '朗': 151.0
         # print(trans_dict)#{'S': {'S': 747969.0, 'E': 0.0, 'M': 0.0, 'B': 563988.0}, 'E': {'S': 737404.0, 'E': 0.0, 'M': 0.0, 'B': 651128.0},
-        # print(start_dict) #{'S': 124543.0, 'E': 0.0, 'M': 0.0, 'B': 173416.0}
+        print(start_dict) #{'S': 124543.0, 'E': 0.0, 'M': 0.0, 'B': 173416.0}
     
         #进行归一化
         for key in start_dict:  # 状态的初始概率
@@ -123,6 +129,7 @@ class HmmTrain:
        # print(emit_dict)#{'S': {'否': 6.211504202703743e-06, '昔': 1.5528760506759358e-05, '直': 0.0001478338000243491,
        # print(trans_dict)#{'S': {'S': 0.46460125869921165, 'E': 0.0, 'M': 0.0, 'B': 0.3503213832274479},
        # print(start_dict)#{'S': 0.41798844132394497, 'E': 0.0, 'M': 0.0, 'B': 0.5820149148537713}
+        print(trans_path)
         self.save_model(trans_dict, trans_path)
         self.save_model(emit_dict, emit_path)
         self.save_model(start_dict, start_path)
@@ -134,10 +141,11 @@ class HmmTrain:
 
 
 if __name__ == "__main__":
-    train_filepath = './data/train.txt'
-    trans_path = './model/prob_trans.model'
-    emit_path = './model/prob_emit.model'
-    start_path = './model/prob_start.model'
+    base_dir = r"D:\codes\tf_models\fork_github\WordSegment"
+    train_filepath = base_dir + r'\data\train.txt'
+    trans_path = base_dir + r'\model\prob_trans.model'
+    emit_path = base_dir + r'\model\prob_emit.model'
+    start_path = base_dir + r'\model\prob_start.model'
     trainer = HmmTrain()
     trainer.train(train_filepath, trans_path, emit_path, start_path)
 
